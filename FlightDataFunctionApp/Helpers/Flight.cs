@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 
 namespace FlightDataFunctionApp.Helpers
 {
@@ -22,11 +23,11 @@ namespace FlightDataFunctionApp.Helpers
                 icao24 = data[0].Trim(),
                 callsign = data[1].Trim(),
                 originCountry = data[2].Trim(),
-                longitute = string.IsNullOrEmpty(data[5]) ? (float?)null : float.Parse(data[5].Trim()),
-                latitude = string.IsNullOrEmpty(data[6]) ? (float?)null : float.Parse(data[6].Trim()),
-                altitude = string.IsNullOrEmpty(data[7]) ? (float?)null : float.Parse(data[7].Trim()),
-                velocity = string.IsNullOrEmpty(data[9]) ? (float?)null : float.Parse(data[9].Trim()),
-                trueTrack = string.IsNullOrEmpty(data[10]) ? (float?)null : float.Parse(data[10].Trim())
+                longitute = string.IsNullOrEmpty(data[5]) ? (float?)null : float.Parse(data[5].Trim(), CultureInfo.InvariantCulture.NumberFormat),
+                latitude = string.IsNullOrEmpty(data[6]) ? (float?)null : float.Parse(data[6].Trim(), CultureInfo.InvariantCulture.NumberFormat),
+                altitude = string.IsNullOrEmpty(data[7]) ? (float?)null : float.Parse(data[7].Trim(), CultureInfo.InvariantCulture.NumberFormat),
+                velocity = string.IsNullOrEmpty(data[9]) ? (float?)null : float.Parse(data[9].Trim(), CultureInfo.InvariantCulture.NumberFormat),
+                trueTrack = string.IsNullOrEmpty(data[10]) ? (float?)null : float.Parse(data[10].Trim(), CultureInfo.InvariantCulture.NumberFormat)
             };
         }
     }

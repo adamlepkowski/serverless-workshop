@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+ <html>
+ <head>
+        <title>Live Flight Data Map</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    
+        <!-- Add references to the Azure Maps Map control JavaScript and CSS files. -->
+        <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" type="text/css">
+        <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+    
+        <!-- Add a reference to the Azure Maps Services Module JavaScript file. -->
+        <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas-service.min.js"></script>
+    
+        <!-- Promis based http client. https://github.com/axios/axios -->
+        <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+        <script src="https://unpkg.com/@aspnet/signalr@1.1.4/dist/browser/signalr.js"></script>
+
+
+     <script>
+        function GetMap() {
+            //Instantiate a map object
+            var map = new atlas.Map("myMap", {
+                //Add your Azure Maps subscription key to the map SDK. Get an Azure Maps key at https://azure.com/maps
+                authOptions: {
+                    authType: 'subscriptionKey',
+                    subscriptionKey: 'value_here'
+                },
+                style: "night",
+                center: [23.847961, 36.33254],
+                zoom: 7
+            });
+            //Wait until the map resources are ready.
+            map.events.add('ready', function () {
+                map.imageSprite.add('plane-icon', 'https://serwerlessworkshop.blob.core.windows.net/icons/plane.png');
+                map.imageSprite.add('plane-monitored-icon', 'https://serwerlessworkshop.blob.core.windows.net/icons/plane-monitored.png');
+                //Create a data source and add it to the map
+                datasource = new atlas.source.DataSource();
+                map.sources.add(datasource);
+                //Create a symbol layer using the data source and add it to the map
+                map.layers.add(
+                    new atlas.layer.SymbolLayer(datasource, null, {
+                        iconOptions: {
+                            ignorePlacement: true,
+                            allowOverlap: true,
+                            image: ['get', 'image'],
+                            size: 0.06,
+                            rotation: ['get', 'rotation']
+                        },
+                        textOptions: {
+                            textField: ['concat', ['to-string', ['get', 'name']], '- ', ['get', 'altitude']],
+                            color: '#FFFFFF',
+                            offset: [4, 0]
+                        }
+                    })
+                );
+                GetConnectionInfo().then(function (info) {
+                    let accessToken = info.accessToken
+                    const options = {
+                        accessTokenFactory: function () {
+                            if (accessToken) {
+                                const _accessToken = accessToken
+                                accessToken = null
+                                return _accessToken
+                            } else {
+                                return GetConnectionInfo().then(function (info) {
+                                    return info.accessToken
+                                })
+                            }
+                        }
+                    }
+                    const connection = new signalR.HubConnectionBuilder()
+                        .withUrl(info.url, options)
+                        .build();
+                        console.log(info.url);
+                        console.log(options);
+                    StartConnection(connection)
+                    connection.on('newFlightData', ProcessFlightData)
+                    connection.on('newRiskFlight', ProcessRiskFlight)
+                    connection.onclose(function () {
+                        console.log('disconnected')
+                        setTimeout(function () { StartConnection(connection) }, 5000)
+                    })
+                }).catch(console.error)
+            });
+        }
+  
+                let datasource;
+        let planes = [];
+        let monitoredPlanes = [];
+
+        function ProcessFlightData(flight) {
+            console.log(flight);
+
+            var newFlightPin = new atlas.Shape(new atlas.data.Point([flight.longitute, flight.latitude]), flight.id);
+            newFlightPin.addProperty('name', flight.callsign);
+            newFlightPin.addProperty('altitude', flight.altitude);
+            newFlightPin.addProperty('rotation', flight.trueTrack);
+
+            if(monitoredPlanes[flight.icao24])
+            {
+                newFlightPin.addProperty('image', 'plane-monitored-icon');
+            }
+            else 
+            {
+                newFlightPin.addProperty('image', 'plane-icon');
+            }            
+
+            planes[flight.icao24] = newFlightPin;
+            datasource.setShapes(Object.values(planes));
+        }
+
+        function ProcessRiskFlight(attentionFlight) {
+            console.log(attentionFlight);
+            monitoredPlanes[attentionFlight.id] = attentionFlight.id;
+        }
+
+        function GetConnectionInfo() {
+            return axios.get('http://localhost:7071/api/SignalRNegotiate')
+            .then(function (response) {
+                console.log(response);
+                return response.data
+            }).catch(console.error)
+        }
+
+        function StartConnection(connection) {
+            console.log('connecting...')
+            connection.start()
+                    .then(function () { console.log('connected!') })
+                .catch(function (err) {
+                    console.log('ER');
+                    console.error(err)
+                    setTimeout(function () { StartConnection(connection) }, 2000)})
+        }
+     
+     </script>
+
+     <style>
+         html,
+         body {
+             width: 100%;
+             height: 100%;
+             padding: 0;
+             margin: 0;
+         }
+
+         #myMap {
+             width: 100%;
+             height: 100%;
+         }
+     </style>
+ </head>
+ <body onload="GetMap()">
+     <div id="myMap"></div>
+ </body>
+ </html>
